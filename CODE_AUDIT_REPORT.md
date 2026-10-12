@@ -109,9 +109,9 @@
 
 **建议与验收：** 将发现页的绑定组件放到对应 feature，保留现有 MovieCard 的 props 组合方式；把纯状态判断放到订阅 feature 的普通 ts 模块。移动后核对导入图和构建，不新增卡片工厂、通用 controller 或多层转发。
 
-**处理结果（2026-10-12）：** `DiscoverMovieCard` 与 `MovieGrid` 移入 features/discover 的 movie-card.tsx、movie-grid.tsx，与 features/library/movie-card.tsx 的既有做法一致；`MovieCard` 的 props 组合方式、`MovieGridLayout` 的网格样式与各调用方渲染结果均未改动，仅把 movie-grid.tsx 改名为 movie-grid-layout.tsx。`isPendingSubscription` 移入 features/subscriptions/subscription-status.ts 普通模块，`SubscriptionCard` 组件文件只保留展示与交互。未新增卡片工厂、通用 controller 或多层转发。
+**处理结果（2026-10-12）：** `DiscoverMovieCard` 与 `MovieGrid` 移入 features/discover 的 movie-card.tsx、movie-grid.tsx，与 features/library/movie-card.tsx 的既有做法一致；`MovieCard` 的 props 组合方式、`MovieGridLayout` 的网格样式与各调用方渲染结果均未改动，仅把 movie-grid.tsx 改名为 movie-grid-layout.tsx。唯一调用方为 `DiscoverMovieCard` 的 `MovieSubscribeButton` 一并移入 features/discover，components/movie 不再保留发现页独占组件。`isPendingSubscription` 移入 features/subscriptions/subscription-status.ts 普通模块，`SubscriptionCard` 组件文件只保留展示与交互。未新增卡片工厂、通用 controller 或多层转发。
 
-**验证：** 源码检索确认 components 目录不再 import `@/features`（仅 app-shell.tsx 组装 feature Provider 的既有依赖）；TypeScript、oxlint、oxfmt 检查通过；前端 30 个测试文件、196 项测试全部通过；生产构建通过。未新增测试，未执行浏览器测试，视觉效果由用户验收。
+**验证：** 源码检索确认 components 目录不再 import `@/features`，也不再包含发现页独占组件（仅 app-shell.tsx 组装 feature Provider 的既有依赖）；全仓无残留引用。TypeScript、oxlint、oxfmt 检查通过；前端 30 个测试文件、196 项测试全部通过；生产构建通过。未新增测试，未执行浏览器测试，视觉效果由用户验收。
 
 ### F08 · P3 · Popover 组件没有调用者
 

@@ -1,7 +1,7 @@
 import type { DiscoverMovie } from '@/api/discover'
 import { MovieCard } from '@/components/movie'
 import { MovieResourceBadges, MovieStateBadge } from '@/components/movie/movie-badges'
-import { MovieSubscribeButton } from '@/components/movie/movie-subscribe-button'
+import { MovieSubscribeButton } from './movie-subscribe-button'
 import { MovieDetailTrigger } from '@/features/movie-detail/detail-trigger'
 
 export function DiscoverMovieCard({ movie }: { movie: DiscoverMovie }) {
