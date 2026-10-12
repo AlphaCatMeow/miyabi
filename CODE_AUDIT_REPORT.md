@@ -87,15 +87,17 @@
 
 **验证：** 新增 11 项本地模拟测试，覆盖慢 401 正文、等待响应头或正文时卸载/手动重连、迟到的 401、网络错误的计时器清理、重复断线、旧连接回调及认证分支。前端 30 个测试文件、196 项测试全部通过；TypeScript、目标文件 Lint 与格式检查通过。未执行浏览器测试或真实服务联调。
 
-### F06 · P3 · 同规格按钮重复指定图标间距，产生局部样式漂移
+### F06 · P3 · 同规格按钮重复指定图标间距，产生局部样式漂移（已完成）
 
 **位置：** [button.tsx:26](E:/ppxb/miyabi/web/src/components/ui/button.tsx:26)、[network-section.tsx:135](E:/ppxb/miyabi/web/src/features/settings/network-section.tsx:135)、[emby-section.tsx:262](E:/ppxb/miyabi/web/src/features/settings/emby-section.tsx:262)、[data-section.tsx:92](E:/ppxb/miyabi/web/src/features/settings/data-section.tsx:92)。
 
-`Button size="sm"` 已提供 gap-1。网络和 Emby 的保存按钮又给加载图标增加 `mr-1.5`，使图标与文字间距叠加为 10px；其他同规格按钮通常只使用 4px gap。前两者还使用 14px 图标，其他按钮沿用默认 16px。
+**原问题：** `Button size="sm"` 已提供 gap-1。网络和 Emby 的保存按钮又给加载图标增加 `mr-1.5`，使图标与文字间距叠加为 10px；其他同规格按钮通常只使用 4px gap。前两者还使用 14px 图标，其他按钮沿用默认 16px。
 
 **影响：** 相同操作栏的加载态间距、图标尺寸不一致；调整统一 Button 样式时仍需追踪局部覆盖。
 
-**建议与验收：** 删除无必要的额外 margin，同规格按钮沿用组件默认尺寸。只在确有不同语义或密度需求时使用局部覆盖。此项属于样式整理，适合由用户视觉验收，不必新增锁定 className 的测试。
+**处理结果（2026-10-12）：** 网络和 Emby 设置中的“保存”按钮移除加载图标的 `mr-1.5`，“测试连接”和“保存”图标均移除 `size-3.5`，统一沿用公共 Button 的默认图标尺寸和间距。保留加载动画、点击行为和禁用条件，并移除两个文件中不再需要的 cn 导入。
+
+**验证：** TypeScript、目标文件 Lint 与格式检查通过；静态核对确认四处图标均沿用公共 Button 样式。未新增样式断言测试，未执行浏览器测试，视觉效果由用户验收。
 
 ### F07 · P3 · 通用影片卡片同时承担展示和发现页业务绑定
 
