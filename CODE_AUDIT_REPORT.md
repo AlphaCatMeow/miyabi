@@ -258,15 +258,19 @@ expires_at 只参与是否命中的判断，写入则按 provider/code upsert。
 
 **建议与验收：** 为该缓存制定有界保留策略，按批回收过期行，并根据清理查询评估 expires_at 索引。范围限定为可重取的来源缓存，保留媒体库已经保存的资料快照和有业务用途的历史记录。验证缓存回收后仍能正确重新获取，且不会删除正式影片资料。
 
-### B12 · P2 · 纠正番号时按扩展名清理，无法区分自定义附件
+### B12 · P2 · 纠正番号时按扩展名清理，无法区分自定义附件（已完成）
 
 **位置：** [scrape/rename_export.go:14](E:/ppxb/miyabi/internal/library/scrape/rename_export.go:14)、[scrape/rename_export.go:36](E:/ppxb/miyabi/internal/library/scrape/rename_export.go:36)、[rename_export_test.go:27](E:/ppxb/miyabi/internal/library/scrape/rename_export_test.go:27)。
 
-removePreviousExport 承诺保留用户文件，但会删除旧目录内全部 .strm、.nfo，以及固定名称的海报和背景图。它没有验证附件是否对应旧影片的生成文件名或本项目的 STRM 内容。
+**原问题：** removePreviousExport 承诺保留用户文件，但会删除旧目录内全部 .strm、.nfo，以及固定名称的海报和背景图。它没有验证附件是否对应旧影片的生成文件名或本项目的 STRM 内容。
 
-**影响：** 如果用户在旧导出目录放入 custom.nfo、bonus.strm 等自定义文件，纠正影片番号时也会被删除。当前测试只验证 original.mp4 和 notes.txt 被保留，没有覆盖同扩展名的非生成文件。本项由删除条件静态确认，未对真实导出目录执行清理。
+**原影响：** 如果用户在旧导出目录放入 custom.nfo、bonus.strm 等自定义文件，纠正影片番号时也会被删除。原测试只验证 original.mp4 和 notes.txt 被保留，没有覆盖同扩展名的非生成文件。本项由删除条件静态确认，未对真实导出目录执行清理。
 
 **建议与验收：** 按旧影片明确的生成文件集合及可确认的归属清理，无法确认归属的文件保留；避免仅以扩展名判定所有权。在临时目录加入自定义 NFO/STRM，验证正常旧附件可清理、自定义附件保留，以及操作重放仍幂等。
+
+**处理结果（2026-10-15）：** 清理规则改为精确匹配旧番号经 nfo.FileStem 编码后的 `.nfo`、`.strm` 和 `-cdN.strm`，分片编号必须为无前导零的正整数；固定名称 poster.jpg、fanart.jpg 沿用原清理规则。不符合生成命名规则的附件保留，包括 custom.nfo、bonus.strm、相近番号及带额外后缀的文件。目录跳过、旧目录被其他影片占用时不清理，以及重复执行的行为均保持不变。判定范围限定为导出文件名，未增加文件清单或内容追踪机制。
+
+**验证：** 回归测试在修复前复现自定义附件误删，修复后验证单文件和多分片清理、自定义附件内容保留、相近名称、特殊字符编码、子目录、重复执行和其他影片占用保护。`go test -mod=readonly ./internal/library/... ./internal/app` 四个包全部通过，格式与 diff 检查通过。测试仅使用临时目录，未操作真实导出目录或执行浏览器测试。
 
 ## 4. 多余、重复和不必要测试
 

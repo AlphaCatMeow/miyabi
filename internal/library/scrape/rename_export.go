@@ -5,15 +5,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/movie"
 	"github.com/ppxb/miyabi/internal/export"
+	"github.com/ppxb/miyabi/internal/nfo"
 )
 
-// Remove only generated media entries after publishing the corrected identity.
-// Original videos and other user files in the old directory remain untouched.
+// Remove files matching the previous movie's generated names after publishing
+// the corrected identity. Unrelated files in the old directory remain untouched.
 func (service *Service) removePreviousExport(ctx context.Context, root string, record *ent.Movie, code string) (string, error) {
 	if root == "" || record.MetadataSnapshot == nil || record.MetadataSnapshot.Code == "" {
 		return "", nil
@@ -34,12 +36,14 @@ func (service *Service) removePreviousExport(ctx context.Context, root string, r
 	if err != nil {
 		return "", err
 	}
+	// Match the writer's exact naming rules, including positive disc numbers.
+	generated := regexp.MustCompile(`^` + regexp.QuoteMeta(nfo.FileStem(oldCode)) + `(?:\.nfo|(?:-cd[1-9][0-9]*)?\.strm)$`)
 	for _, entry := range entries {
-		ext := strings.ToLower(filepath.Ext(entry.Name()))
-		if entry.IsDir() || (ext != ".strm" && ext != ".nfo" && entry.Name() != "poster.jpg" && entry.Name() != "fanart.jpg") {
+		name := entry.Name()
+		if entry.IsDir() || (name != "poster.jpg" && name != "fanart.jpg" && !generated.MatchString(name)) {
 			continue
 		}
-		if err := os.Remove(filepath.Join(oldDir, entry.Name())); err != nil && !os.IsNotExist(err) {
+		if err := os.Remove(filepath.Join(oldDir, name)); err != nil && !os.IsNotExist(err) {
 			return "", fmt.Errorf("remove previous export: %w", err)
 		}
 	}
