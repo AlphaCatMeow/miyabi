@@ -296,15 +296,19 @@ expires_at 只参与是否命中的判断，写入则按 provider/code upsert。
 
 **收益与边界：** 避免测试原型正确被误当成生产流程正确。保留真实调用 Normalize、Parse 的语料测试和有价值的 fixture；它们覆盖真实输入差异，不应随原型一起删掉。
 
-### T03 · P2 · 订阅索引测试复制实现，只验证自己构造的 Map
+### T03 · P2 · 订阅索引测试复制实现，只验证自己构造的 Map（已完成）
 
 **位置：** [subscriptions.test.ts:50](E:/ppxb/miyabi/web/tests/subscriptions.test.ts:50)、[subscriptions.test.ts:61](E:/ppxb/miyabi/web/tests/subscriptions.test.ts:61)、[api/subscriptions.ts:55](E:/ppxb/miyabi/web/src/api/subscriptions.ts:55)。
 
-“超过 100 条且 O(1) 查询”的测试自己构造 150 条数据，自己写 queryFn、staleTime 和 select，再断言自己创建的 Map。它没有调用生产 useSubscriptionTargets 的配置，也没有经过实际 API；即使生产 select 出错或请求重新出现数量截断，该测试仍可能通过。Map.get 的结果断言也不能证明整条路径的复杂度，F03 就未被覆盖。
+**原问题：** “超过 100 条且 O(1) 查询”的测试自己构造 150 条数据，自己写 queryFn、staleTime 和 select，再断言自己创建的 Map。它没有调用生产 useSubscriptionTargets 的配置，也没有经过实际 API；即使生产 select 出错或请求重新出现数量截断，该测试仍可能通过。Map.get 的结果断言也不能证明整条路径的复杂度，F03 就未被覆盖。
 
 **处理建议：重写，不保留复制实现。** 让生产 Hook 与测试共享实际 query options/选择函数，或采用项目现有的捕获真实 Hook 配置方式。替换测试自写的 select，验证真实数据来源、超过 100 条的结果和多消费者处理成本。
 
 **收益与边界：** 删除的是测试中的第二份实现。subscriptionKeys 的层级契约仍有验证价值；无需重复测试 TanStack Query 本身的通用算法。两个查询测试文件中重复的 observe/settled 辅助代码，也可在确有复用时合并成小型测试工具。
+
+**处理结果（2026-10-15）：** 改为捕获真实 useSubscriptionTargets 的查询配置并交给 QueryObserver 执行，仅在 fetch 边界模拟响应。覆盖影片、演员和全部订阅三种查询，验证真实接口路径、筛选参数、取消信号，以及 150 条结果和第 1、101、150 条索引内容。保留原有缓存失效测试，移除未被验证的 O(1) 表述；多消费者索引构建成本仍归 F03，本项未修改业务实现。
+
+**验证：** subscriptions 与 settings-cache 两个文件共 8 项测试通过，TypeScript、目标文件 Lint 与格式检查通过。临时将正式索引截断至 100 条或改为错误接口时，三种查询用例均按预期失败；还原后通过。未安装依赖，未执行浏览器测试。
 
 ### T04 · P3 · 健康检查的成功与 503 用例重复验证同一个函数
 
@@ -411,9 +415,9 @@ USE TEMP B-TREE FOR ORDER BY
 
 测试精简应按以下边界执行：
 
-- **已完成：** T01 的两个重复函数已随 B10 删除，独有覆盖已保留。
+- **已完成：** T01 的两个重复函数已随 B10 删除，独有覆盖已保留；T03 已替换为真实 Hook 查询配置测试。
 - **可直接列入合并候选：** T04 重复的成功/503 探测场景、T05 与业务目标无关的装饰性断言。
-- **应先迁移或重写：** T02 的独有原型场景、T03 的复制实现、T05 脆弱的 effect 定位。不能先删除，再假设其他测试会覆盖。
+- **应先迁移或重写：** T02 的独有原型场景、T05 脆弱的 effect 定位。不能先删除，再假设其他测试会覆盖。
 - **应保留：** 请求乱序、取消、令牌刷新、来源切换、任务恢复、事务回滚、幂等导出、编号身份等不同故障窗口的测试。
 - **应修正规则：** T06 的架构名单和 B05 对应的慢响应体并发场景。
 
