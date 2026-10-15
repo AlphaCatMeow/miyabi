@@ -9,6 +9,7 @@ import (
 
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/ent/movie"
+	"github.com/ppxb/miyabi/internal/export"
 )
 
 // Remove only generated media entries after publishing the corrected identity.
@@ -18,8 +19,8 @@ func (service *Service) removePreviousExport(ctx context.Context, root string, r
 		return "", nil
 	}
 	oldCode := record.MetadataSnapshot.Code
-	oldDir := EmbyMovieDir(root, oldCode)
-	if strings.EqualFold(oldDir, EmbyMovieDir(root, code)) {
+	oldDir := export.EmbyMovieDir(root, oldCode)
+	if strings.EqualFold(oldDir, export.EmbyMovieDir(root, code)) {
 		return "", nil
 	}
 	claimed, err := service.db.Movie.Query().Where(movie.CodeEQ(oldCode), movie.IDNEQ(record.ID)).Exist(ctx)

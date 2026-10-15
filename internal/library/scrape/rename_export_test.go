@@ -7,6 +7,7 @@ import (
 
 	"github.com/ppxb/miyabi/internal/database"
 	"github.com/ppxb/miyabi/internal/domain"
+	"github.com/ppxb/miyabi/internal/export"
 )
 
 func TestCorrectedExportCleanupPreservesVideosAndCanReplay(t *testing.T) {
@@ -18,7 +19,7 @@ func TestCorrectedExportCleanupPreservesVideosAndCanReplay(t *testing.T) {
 	service := &Service{db: store.Client}
 	record := store.Client.Movie.Create().SetCode("IPX-123").SetMetadataSnapshot(&domain.MetadataSnapshot{Code: "ABP-001"}).SaveX(t.Context())
 	root := t.TempDir()
-	oldDir, newDir := EmbyMovieDir(root, "ABP-001"), EmbyMovieDir(root, "IPX-123")
+	oldDir, newDir := export.EmbyMovieDir(root, "ABP-001"), export.EmbyMovieDir(root, "IPX-123")
 	for _, dir := range []string{oldDir, newDir} {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			t.Fatal(err)

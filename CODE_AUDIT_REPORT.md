@@ -5,9 +5,9 @@
 
 ## 1. 审计结论与范围
 
-本次记录 **29 项发现：P1 2 项、P2 17 项、P3 10 项**。其中前端 9 项、后端 12 项、测试 6 项、工程配置 2 项。统计包含维护性改进，不表示存在 29 个独立的运行时故障。
+本报告保留 **28 项发现：P1 2 项、P2 16 项、P3 10 项**。其中前端 9 项、后端 11 项、测试 6 项、工程配置 2 项。统计包含维护性改进，不表示存在 28 个独立的运行时故障。
 
-统计和优先级保留原审计分类；后续整改状态在对应条目中更新。
+统计不含已移除的条目，其余条目保留原审计编号和优先级；后续整改状态在对应条目中更新。
 
 最先处理的是图片代理的目标地址边界，以及演员订阅失败后仍推进游标的问题。两者均已通过隔离的本地验证确认。另已验证 Debug SQL 日志暴露设置值、图片响应缺少字节限制、115 并发限制提前释放，并检查了演员新作查询的 SQLite 执行计划。
 
@@ -16,7 +16,7 @@
 | 优先级 | 含义                                           | 数量 |
 | ------ | ---------------------------------------------- | ---: |
 | P1     | 应优先修复的访问边界或业务数据遗漏问题         |    2 |
-| P2     | 有明确触发条件的可靠性、资源、性能或可用性问题 |   17 |
+| P2     | 有明确触发条件的可靠性、资源、性能或可用性问题 |   16 |
 | P3     | 冗余、组织、样式或测试维护性问题               |   10 |
 
 审查覆盖前端样式、重复实现、职责划分、状态管理、错误处理、性能，以及后端 API、订阅、任务、扫描、元数据、图片、导出、数据库和工程配置；同时加入多余、不必要、重复及与实现过度绑定的测试审查。
@@ -234,25 +234,19 @@ USE TEMP B-TREE FOR ORDER BY
 
 **验证：** Windows 原生与本机已有 Linux 容器中，atomicfile、export、library/scrape、subtitle 四个包的测试均通过。新增测试覆盖新建/覆盖/空内容、写入中途失败不发布半份文件、替换失败清理临时文件、已有读取句柄及失败后重试、权限与符号链接保留；Linux 额外验证 umask。现有测试继续验证导出顺序、增量导出、STRM 地址/Token 重写和字幕复用。未执行浏览器测试。
 
-### B09 · P2 · JSON 请求体没有字节上限和读取期限
-
-**位置：** [api/helpers.go:11](E:/ppxb/miyabi/internal/api/helpers.go:11)、[api/auth.go:23](E:/ppxb/miyabi/internal/api/auth.go:23)、[api/auth.go:65](E:/ppxb/miyabi/internal/api/auth.go:65)、[app/app.go:205](E:/ppxb/miyabi/internal/app/app.go:205)。
-
-统一 bindJSON 直接解码 Request.Body，没有 MaxBytesReader。字段的长度、数组数量校验在解码之后执行，不能限制解码阶段分配。HTTP Server 只配置 ReadHeaderTimeout 和 IdleTimeout，没有限制已经收完请求头的 JSON 请求体读取时间。
-
-**影响：** 异常大 JSON 可以在被校验拒绝前大量占用内存；慢速请求体会持续占用处理资源。登录接口虽有限流，单个获准请求仍没有该边界。
-
-**建议与验收：** 按实际最大批量输入给 JSON 路由设置合理字节和读取期限，超限返回可识别错误。将限制限定在 JSON 请求体，保留 SSE 和媒体流的长连接行为；验证正常批量请求、超大输入和慢读取取消。
-
-### B10 · P3 · 导出职责分散，旧转发接口继续维持不必要的依赖
+### B10 · P3 · 导出职责分散，旧转发接口继续维持不必要的依赖（已完成）
 
 **位置：** [scrape/export.go:20](E:/ppxb/miyabi/internal/library/scrape/export.go:20)、[scrape/export.go:87](E:/ppxb/miyabi/internal/library/scrape/export.go:87)、[scrape/scrape.go:122](E:/ppxb/miyabi/internal/library/scrape/scrape.go:122)、[scan/local_ingest.go:75](E:/ppxb/miyabi/internal/library/scan/local_ingest.go:75)。
 
-项目已有 internal/export，scrape 却继续重导出其配置、管理器、常量和函数，并保留无生产调用者的 RewriteSTRM 包装和仅被测试使用的 SetEmbyExport。实际的媒体附件写出又在 scrape/export.go。扫描代码仍通过 scrape 间接调用原本属于 export 的 STRM 解析等能力。
+**原问题：** 项目已有 internal/export，scrape 却继续重导出其配置、管理器、常量和函数，并保留无生产调用者的 RewriteSTRM 包装和仅被测试使用的 SetEmbyExport。实际的媒体附件写出又在 scrape/export.go。扫描代码仍通过 scrape 间接调用原本属于 export 的 STRM 解析等能力。
 
 **影响：** 功能归属需要跨两个包判断，重构后的兼容壳增加维护面；部分测试仅为这些转发层重复运行，详见 T01。
 
 **建议与验收：** 调用方直接使用实际归属包，逐步把文件输出职责集中到 export；刮削保留业务编排与检查点。测试改用已有构造参数注入导出配置，随后删除确认无生产用途的旧包装。保留当前小函数组合，不再加一层 exporter 管理框架。
+
+**处理结果（2026-10-15）：** 媒体附件写出和内部排序迁入 [export/media.go](E:/ppxb/miyabi/internal/export/media.go)，通过 WriteMedia 接收 export.Config 并返回文件变更状态，删除原本只丢弃变更状态的包装。移除 scrape 的导出类型、常量、函数别名、RewriteSTRM 包装和 SetEmbyExport，以及 scan 的 MediaNotifier 转发别名；扫描、刮削、媒体库及测试直接引用 export。scrape 保留保存资料与缓存图片的输入准备、发布事务和检查点，不让 export 反向依赖 scrape。纯文件导出测试迁至 export，字幕任务测试通过现有 Dependencies 注入配置，STRM 重写和解析的重复测试按 T01 删除。未新增依赖或管理层。
+
+**验证：** `go test -mod=readonly ./internal/export ./internal/library/... ./internal/app ./internal/emby` 六个包全部通过，覆盖文件内容、输出顺序、自然排序、分片命名、旧 STRM 清理、增量导出、扫描重试、资料重建和 Emby 通知。静态检索确认无旧转发接口引用，保留 B08 的 atomicfile 写入路径；格式与 diff 检查通过，未执行浏览器测试。
 
 ### B11 · P2 · 持久化元数据缓存过期后没有回收机制
 
@@ -276,15 +270,17 @@ removePreviousExport 承诺保留用户文件，但会删除旧目录内全部 .
 
 ## 4. 多余、重复和不必要测试
 
-### T01 · P3 · STRM 重写与解析测试跨包重复
+### T01 · P3 · STRM 重写与解析测试跨包重复（已完成）
 
 **位置：** [export/export_test.go:15](E:/ppxb/miyabi/internal/export/export_test.go:15)、[export/export_test.go:87](E:/ppxb/miyabi/internal/export/export_test.go:87)、[scrape/export_test.go:209](E:/ppxb/miyabi/internal/library/scrape/export_test.go:209)、[scrape/export_test.go:273](E:/ppxb/miyabi/internal/library/scrape/export_test.go:273)。
 
-两个包中的 TestRewriteSTRM 使用相同目录、文件内容、目标地址、幂等和令牌轮换场景；scrape 的函数只转调 export。TestParseSTRMFileID 的六组输入和断言相同，scrape 版本调用的也是函数别名。export 版本还额外覆盖取消，测试信息更多。
+**原问题：** 两个包中的 TestRewriteSTRM 使用相同目录、文件内容、目标地址、幂等和令牌轮换场景；scrape 的函数只转调 export。TestParseSTRMFileID 的六组输入和断言相同，scrape 版本调用的也是函数别名。export 版本还额外覆盖取消，测试信息更多。
 
 **处理建议：合并并删除重复函数。** 以 internal/export 中的测试为准；清理旧包装后，删除 scrape 中这两个重复测试函数。保留同文件中的媒体附件输出顺序、分片命名、旧 STRM 清理和增量导出测试，这些验证了不同的业务行为。
 
 **收益与边界：** 减少两套几乎相同用例的维护成本；不建议删除整个 scrape/export_test.go，也不把不同业务层的集成测试全部视为重复。
+
+**处理结果与验证（2026-10-15）：** 随 B10 移除 scrape 中的 TestRewriteSTRM 和 TestParseSTRMFileID，保留 export 中包含取消场景的原测试。附件内容、输出顺序、排序、分片命名和旧 STRM 清理测试随实现迁至 export；scrape 的保存资料导出与增量导出测试继续保留。B10 所列六个包测试全部通过。
 
 ### T02 · P3 · 实验性解析器在测试文件内自成一套实现
 
@@ -405,13 +401,14 @@ USE TEMP B-TREE FOR ORDER BY
 | 顺序 | 工作范围                                        | 最小验证重点                                                                              |
 | ---- | ----------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | 1    | B01、B02：图片访问边界和漏订问题                | 合法图片仍可获取；错误目标被阻止；失败的子订阅可重试且不重复创建                          |
-| 2    | B03/B04/B05/B08/B09/B12：日志、资源和文件完整性 | 敏感值不进入日志；慢响应不突破并发；超限/取消及时释放；覆盖失败保留旧文件；保留自定义附件 |
+| 2    | B03/B04/B05/B08/B12：日志、资源和文件完整性     | 敏感值不进入日志；慢响应不突破并发；超限/取消及时释放；覆盖失败保留旧文件；保留自定义附件 |
 | 3    | F03/F04/F05/F09、B06/B07/B11：状态与规模问题    | 真实查询配置、异步取消、缓存保留、宽目录树、查询计划和缓存容量                            |
 | 4    | F01/F02/F06/F07/F08、B10、测试整理及 CI         | 遵守业务层无 aria 约定，保留 shadcn 原始实现；导入与构建通过；删除重复测试前迁移独有覆盖  |
 
 测试精简应按以下边界执行：
 
-- **可直接列入合并候选：** T01 的两个重复函数、T04 重复的成功/503 探测场景、T05 与业务目标无关的装饰性断言。
+- **已完成：** T01 的两个重复函数已随 B10 删除，独有覆盖已保留。
+- **可直接列入合并候选：** T04 重复的成功/503 探测场景、T05 与业务目标无关的装饰性断言。
 - **应先迁移或重写：** T02 的独有原型场景、T03 的复制实现、T05 脆弱的 effect 定位。不能先删除，再假设其他测试会覆盖。
 - **应保留：** 请求乱序、取消、令牌刷新、来源切换、任务恢复、事务回滚、幂等导出、编号身份等不同故障窗口的测试。
 - **应修正规则：** T06 的架构名单和 B05 对应的慢响应体并发场景。
