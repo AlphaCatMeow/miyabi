@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/ppxb/miyabi/internal/atomicfile"
 	"github.com/ppxb/miyabi/internal/ent"
 	"github.com/ppxb/miyabi/internal/export"
 	mediaimage "github.com/ppxb/miyabi/internal/image"
@@ -111,7 +112,7 @@ func exportEmbyMedia(embyDir, publicURL, strmToken, code string, doc nfo.Movie, 
 		if err != nil && !os.IsNotExist(err) {
 			return err
 		}
-		if err := os.WriteFile(path, body, 0o644); err != nil {
+		if err := atomicfile.WriteFile(path, body, 0o644); err != nil {
 			return err
 		}
 		changed = true

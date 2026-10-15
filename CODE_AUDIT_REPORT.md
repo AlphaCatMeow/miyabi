@@ -222,15 +222,17 @@ USE TEMP B-TREE FOR ORDER BY
 
 **建议与验收：** 评估增加 (kind, origin_id, release_date, id) 组合索引，先针对该实际查询优化。使用代表性数据核对查询计划、分页结果和写入成本，再决定是否另行优化全部演员视图。本次只验证计划，未进行生产数据压测。
 
-### B08 · P2 · 媒体附件直接覆盖写入，失败可能留下截断文件
+### B08 · P2 · 媒体附件直接覆盖写入，失败可能留下截断文件（已完成）
 
 **位置：** [scrape/export.go:105](E:/ppxb/miyabi/internal/library/scrape/export.go:105)、[export/export.go:81](E:/ppxb/miyabi/internal/export/export.go:81)、[subtitle/service.go:148](E:/ppxb/miyabi/internal/subtitle/service.go:148)。
 
-NFO、STRM、导出图片及字幕使用 os.WriteFile 直接写最终文件。已存在的文件会先被截断；写入中断、磁盘错误或进程退出时，旧内容不能保留。Emby 等独立进程也不受应用内部互斥锁保护，可能在覆盖期间读到半份内容。
+**原问题：** NFO、STRM、导出图片及字幕使用 os.WriteFile 直接写最终文件。已存在的文件会先被截断；写入中断、磁盘错误或进程退出时，旧内容不能保留。Emby 等独立进程也不受应用内部互斥锁保护，可能在覆盖期间读到半份内容。
 
 **影响：** 重建、地址重写等操作可能短暂或持续产生不可读附件。任务重试有机会修复，但不能替代发布时的完整性保护。
 
-**建议与验收：** 同目录临时文件写完并关闭后，再使用适配目标平台的替换方式发布；保留图片/NFO 先于 STRM 的顺序和重复导出不改写相同文件的行为。已有 image.Cache 的临时写入实现可作为一致性参考。验证覆盖失败时旧文件仍完整，以及 Windows/Linux 上的替换行为。
+**处理结果（2026-10-15）：** 三处写入统一使用 internal/atomicfile.WriteFile，在同目录临时文件写完并成功关闭后，通过 os.Rename 替换目标；Windows 使用标准库的 MoveFileEx(REPLACE_EXISTING)。写入或替换失败时清理临时文件并保留旧内容，不预先删除目标文件。保留已有文件权限、指向已有文件的符号链接、新文件的 umask，以及图片/NFO 先于 STRM 的顺序和相同内容不重复改写的行为，未新增依赖。
+
+**验证：** Windows 原生与本机已有 Linux 容器中，atomicfile、export、library/scrape、subtitle 四个包的测试均通过。新增测试覆盖新建/覆盖/空内容、写入中途失败不发布半份文件、替换失败清理临时文件、已有读取句柄及失败后重试、权限与符号链接保留；Linux 额外验证 umask。现有测试继续验证导出顺序、增量导出、STRM 地址/Token 重写和字幕复用。未执行浏览器测试。
 
 ### B09 · P2 · JSON 请求体没有字节上限和读取期限
 
