@@ -356,15 +356,15 @@ expires_at 只参与是否命中的判断，写入则按 provider/code upsert。
 
 **建议与验收：** 为普通变更加入已有检查命令，发布依赖其成功结果；按前后端变更范围控制执行成本。本项只评价仓库内配置，不推断仓库外是否另有 CI 或分支保护。本次没有创建或触发外部工作流。
 
-### C02 · P2 · 运行镜像创建了专用用户，但最终仍默认使用 root
+### C02 · P2 · 运行镜像创建了专用用户，但最终仍默认使用 root（已失效）
 
-**位置：** [Dockerfile:34](E:/ppxb/miyabi/Dockerfile:34)、[Dockerfile:39](E:/ppxb/miyabi/Dockerfile:39)、[Dockerfile:56](E:/ppxb/miyabi/Dockerfile:56)。
+**位置：** [Dockerfile:34](E:/ppxb/miyabi/Dockerfile:34)。
 
-runtime 阶段创建 miyabi 用户并设置目录所有权，却没有 USER 指令。Debian 基础镜像的默认身份因此仍被继承；COPY --chown 只改变文件所有权，不改变运行用户。
+**原问题：** runtime 阶段创建 miyabi 用户并设置目录所有权，但没有 USER 指令，实际继承 Debian 基础镜像的 root 身份。
 
-**影响：** 专用用户配置没有达到预期，进程拥有不必要的权限。
+**处理结果（2026-10-15）：** 用户已明确容器直接使用 root，不再设置独立 miyabi 用户，本项不再适用。移除 groupadd、useradd、目录 chown 和 COPY --chown，保留 /app/data 创建及现有启动配置。
 
-**建议与验收：** 在确认数据卷和 Emby 输出目录的权限后使用专用用户运行。核对新建数据目录、已有挂载目录及健康检查，避免仅添加 USER 就造成历史部署无法写入。本次未构建或启动容器。
+**验证：** 静态检查确认 Dockerfile 不再包含专用用户、用户组或所有权设置，Git 差异检查通过。未安装依赖，未重新构建或启动容器。
 
 ## 6. 本次验证记录
 
