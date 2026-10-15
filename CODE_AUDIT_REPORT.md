@@ -330,15 +330,19 @@ expires_at 只参与是否命中的判断，写入则按 provider/code upsert。
 
 **验证：** subscription-card、task-events 和 query-refresh 共 43 项测试通过，TypeScript、目标文件 Lint 与格式检查通过。临时增加静态包裹层、前置同级节点、调整按钮尺寸及插入无关 effect 后，卡片/SSE 的 38 项测试仍通过；仅在选择状态增加包裹层时，封面祖先路径测试按预期失败。临时修改均已还原，未安装依赖，未执行浏览器测试。
 
-### T06 · P3 · 架构测试的包名单没有覆盖新增元数据模块
+### T06 · P3 · 架构测试的包名单没有覆盖新增元数据模块（已完成）
 
 **位置：** [deps_test.go:16](E:/ppxb/miyabi/internal/app/deps_test.go:16)、[deps_test.go:61](E:/ppxb/miyabi/internal/app/deps_test.go:61)、[metadata/service.go:1](E:/ppxb/miyabi/internal/metadata/service.go:1)。
 
-TestBusinessPackagesDoNotImportEachOther 使用手写 business/shared 包名单，并只读取每个目录的直接 Go 文件。metadata 及其 providers 未被纳入检查对象或相应禁用规则；这些包的依赖发生变化时，现有测试可能始终通过。
+**原问题：** TestBusinessPackagesDoNotImportEachOther 使用手写 business/shared 包名单，并只读取每个目录的直接 Go 文件。metadata 及其 providers 未被纳入检查对象或相应禁用规则；这些包的依赖发生变化时，现有测试可能始终通过。
 
 **处理建议：更新覆盖边界，不删除测试。** 将当前真实业务包纳入名单，明确来源适配器的允许依赖。保留已经有意允许的包内关系，不根据目录名称建立一套过宽的禁止规则。
 
 **收益与边界：** 让架构测试约束当前项目结构，而不是只维持重构前的部分目录。该测试成本较低且规则有实际价值，问题是规则陈旧，不是“存在架构测试”本身。
+
+**处理结果（2026-10-15）：** 将 metadata 和 metadata/providers 显式加入 business 名单，同时覆盖它们自身的 import 和其他受检包对它们的依赖。允许 metadata/providers 使用 metadata 和 catalogue，保留原有 library → library/scan → library/scrape 关系；metadata 核心不能反向依赖来源适配器。继续使用现有检查机制，未扩大到所有目录或改动业务实现。
+
+**验证：** TestBusinessPackagesDoNotImportEachOther 通过，gofmt 与 Git 差异检查通过。使用编译后的架构测试读取临时源码，分别验证 metadata → library、metadata/providers → offline、domain → metadata、library → metadata/providers、metadata → metadata/providers 均被规则拒绝；清理临时文件后再次通过。未安装依赖，未执行浏览器测试。
 
 ## 5. 工程配置
 
@@ -415,11 +419,11 @@ USE TEMP B-TREE FOR ORDER BY
 
 测试精简应按以下边界执行：
 
-- **已完成：** T01 的两个重复函数已随 B10 删除，独有覆盖已保留；T03 已替换为真实 Hook 查询配置测试；T05 已清理装饰性断言和依赖固定位置的定位。
+- **已完成：** T01 的两个重复函数已随 B10 删除，独有覆盖已保留；T03 已替换为真实 Hook 查询配置测试；T05 已清理装饰性断言和依赖固定位置的定位；T06 已补齐元数据模块的架构规则。
 - **已失效：** T04 随健康检查功能及对应测试删除而不再适用。
 - **应先迁移或重写：** T02 的独有原型场景。不能先删除，再假设其他测试会覆盖。
 - **应保留：** 请求乱序、取消、令牌刷新、来源切换、任务恢复、事务回滚、幂等导出、编号身份等不同故障窗口的测试。
-- **应修正规则：** T06 的架构名单和 B05 对应的慢响应体并发场景。
+- **应修正规则：** B05 对应的慢响应体并发场景。
 
 尤其应保留 [query-refresh.test.ts](E:/ppxb/miyabi/web/tests/query-refresh.test.ts)、[task-events.test.tsx](E:/ppxb/miyabi/web/tests/task-events.test.tsx)、[token_test.go](E:/ppxb/miyabi/internal/drive/token_test.go)、[concurrency_test.go](E:/ppxb/miyabi/internal/offline/concurrency_test.go)、[scan_regression_test.go](E:/ppxb/miyabi/internal/library/scan_regression_test.go)、[retry_test.go](E:/ppxb/miyabi/internal/tasks/retry_test.go) 中针对具体故障场景的覆盖。它们有相似的准备代码，不等于验证的是同一件事。
 
