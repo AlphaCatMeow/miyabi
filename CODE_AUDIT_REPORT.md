@@ -310,25 +310,25 @@ expires_at 只参与是否命中的判断，写入则按 provider/code upsert。
 
 **验证：** subscriptions 与 settings-cache 两个文件共 8 项测试通过，TypeScript、目标文件 Lint 与格式检查通过。临时将正式索引截断至 100 条或改为错误接口时，三种查询用例均按预期失败；还原后通过。未安装依赖，未执行浏览器测试。
 
-### T04 · P3 · 健康检查的成功与 503 用例重复验证同一个函数
+### T04 · P3 · 健康检查的成功与 503 用例重复验证同一个函数（已失效）
 
-**位置：** [app/app_test.go:56](E:/ppxb/miyabi/internal/app/app_test.go:56)、[cmd/healthcheck_test.go:14](E:/ppxb/miyabi/cmd/miyabi/healthcheck_test.go:14)、[cmd/healthcheck_test.go:57](E:/ppxb/miyabi/cmd/miyabi/healthcheck_test.go:57)、[cmd/healthcheck.go:7](E:/ppxb/miyabi/cmd/miyabi/healthcheck.go:7)。
+**原问题：** cmd.checkHealth 仅转调 app.CheckHealth；两边分别建立 HTTP 服务验证正常状态和 503，没有增加独立的边界覆盖。
 
-cmd.checkHealth 仅转调 app.CheckHealth；两边分别建立 HTTP 服务验证正常状态和 503。该部分没有增加独立的边界覆盖。
+**核对结果（2026-10-15）：** 健康检查实现、命令入口及对应测试均已删除，本项不再适用，无需恢复功能或迁移旧测试。当前 [cmd/cmd_test.go:8](E:/ppxb/miyabi/cmd/cmd_test.go:8) 验证 healthcheck 参数被拒绝，[removed_routes_test.go:5](E:/ppxb/miyabi/internal/api/removed_routes_test.go:5) 验证 /api/health 未注册；这些是删除功能后的有效约束，应保留。
 
-**处理建议：集中函数用例，保留命令入口测试。** 将 HTTP 探测行为集中在实际函数所属层；cmd 重点保留 healthcheck 子命令读取配置、使用 loopback、不启动应用和不创建数据目录等入口契约。
-
-**收益与边界：** 无效地址、IPv6、重定向和超时各有独立价值，应保留或迁移。不要因测试耗时就删除唯一的超时验证。
-
-### T05 · P3 · 部分组件测试锁定内部结构，并手动模拟 React 生命周期
+### T05 · P3 · 部分组件测试锁定内部结构，并手动模拟 React 生命周期（已完成测试清理）
 
 **位置：** [subscription-card.test.tsx:49](E:/ppxb/miyabi/web/tests/subscription-card.test.tsx:49)、[subscription-card.test.tsx:68](E:/ppxb/miyabi/web/tests/subscription-card.test.tsx:68)、[subscription-card.test.tsx:95](E:/ppxb/miyabi/web/tests/subscription-card.test.tsx:95)、[task-events.test.tsx:22](E:/ppxb/miyabi/web/tests/task-events.test.tsx:22)、[task-events.test.tsx:114](E:/ppxb/miyabi/web/tests/task-events.test.tsx:114)。
 
-组件测试直接调用组件函数，按 children 索引取节点，并断言按钮必须为 icon-sm、某个 children 必须为空。SSE 测试通过全局 mock useEffect，再取倒数第二个调用手动 setup/cleanup；这依赖内部 effect 数量和顺序。
+**原问题：** 组件测试直接调用组件函数，按 children 索引取节点，并断言按钮必须为 icon-sm、某个 children 必须为空。SSE 测试通过全局 mock useEffect，再取倒数第二个调用手动 setup/cleanup；这依赖内部 effect 数量和顺序。
 
 **影响：** 无行为变化的包裹层、插槽或 effect 整理可能导致测试失败；手动执行 effect 又不能验证真实 React 的重渲染调度。它们仍能验证部分纯逻辑，不应整体判为无效。
 
 **处理建议：精简装饰性断言和脆弱定位。** 删除与行为目标无关的 size/空 children 断言，减少固定索引访问；网络事件与取消逻辑使用明确的测试入口。保留点击隔离、选择行为、旧响应不能覆盖新快照等有效断言。不要为测试另造 React 运行模型，也不要按此项要求新增业务 aria。
+
+**处理结果（2026-10-15）：** 卡片测试按组件类型查找节点，比较选择前后完整祖先路径的类型和 key，保留封面稳定性、选择、禁用和点击隔离验证，移除 size/空 children 断言。SSE 测试按当前 QueryClient 定位唯一连接 effect，并由测试 spy 捕获真实重连回调，不再依赖 effect 注册顺序。仍以真实 setup/cleanup 验证事件和资源清理逻辑，不声称覆盖 React 的重渲染调度；未改动业务实现或引入测试框架。
+
+**验证：** subscription-card、task-events 和 query-refresh 共 43 项测试通过，TypeScript、目标文件 Lint 与格式检查通过。临时增加静态包裹层、前置同级节点、调整按钮尺寸及插入无关 effect 后，卡片/SSE 的 38 项测试仍通过；仅在选择状态增加包裹层时，封面祖先路径测试按预期失败。临时修改均已还原，未安装依赖，未执行浏览器测试。
 
 ### T06 · P3 · 架构测试的包名单没有覆盖新增元数据模块
 
@@ -415,9 +415,9 @@ USE TEMP B-TREE FOR ORDER BY
 
 测试精简应按以下边界执行：
 
-- **已完成：** T01 的两个重复函数已随 B10 删除，独有覆盖已保留；T03 已替换为真实 Hook 查询配置测试。
-- **可直接列入合并候选：** T04 重复的成功/503 探测场景、T05 与业务目标无关的装饰性断言。
-- **应先迁移或重写：** T02 的独有原型场景、T05 脆弱的 effect 定位。不能先删除，再假设其他测试会覆盖。
+- **已完成：** T01 的两个重复函数已随 B10 删除，独有覆盖已保留；T03 已替换为真实 Hook 查询配置测试；T05 已清理装饰性断言和依赖固定位置的定位。
+- **已失效：** T04 随健康检查功能及对应测试删除而不再适用。
+- **应先迁移或重写：** T02 的独有原型场景。不能先删除，再假设其他测试会覆盖。
 - **应保留：** 请求乱序、取消、令牌刷新、来源切换、任务恢复、事务回滚、幂等导出、编号身份等不同故障窗口的测试。
 - **应修正规则：** T06 的架构名单和 B05 对应的慢响应体并发场景。
 
